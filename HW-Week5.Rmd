@@ -1,0 +1,148 @@
+---
+title: "HW-Week5"
+author: "Zhuoyang Chen"
+date: "February 6, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercise
+### 1. Set up a new package.
+Choose File -> New Project -> New Directory -> R Package. Name it "zhcweek5".
+
+### 2. Use the reading_in function as your first function in the newly generated package. Describe the steps you have to take in order to make that function part of the package.
+By default I saw a file opened automatically for me called "hello.R". I copied the whole function content in the homework documentation, then adjusted it such as add **#'** in lines without it, re-indent lines that looks uncomfortable. At last went to the directory where the package "zhcweek5" is, went into "R" directory, found the R file "hello.R" and renamed it as **reading_in.R**.
+
+### 3. Make sure to adapt the DESCRIPTION file to note all the packages that this function depends on.
+Under the working directory, I found the file **DESCRIPTION**. Opened it and re-wrote information such as "Package", "Title", "Author", "Description" etc. Then I added a new tag **Imports**, and noticed that packages that it needs is **data.table** to use shell command and **magrittr** to use pipe operation. So I wrote **Imports: data.table, magrittr**.
+
+### 4. Load the function into your workspace and use it to extract the values of FastQC's diagnostic "Per base sequence quality" from a single fastqc_data.txt file into an Robject.
+#### Each FastQC run should have produced such a file - it's fine to download these files to your computer.
+#### The command would go into the Rmd document that will become your vignette.
+Before using it, I went into the "man" directory, found the file "hello.Rd" and renamed it as **reading_in.Rd**. Then opened it and re-wrote the information of "name", "title", "usage", "description" etc. Finally went back to the directory that contains "DESCRIPTION", clicked **Build** option at the top and clicked **Build and Reload**.
+
+Some steps could be more easily accomplished by **devtool** and **roxygen2** and will be discussed in question 10.
+
+I used the FastQC report of sample WT1_replicate1 (ERR458493) as input file and noticed that the result to be extract is the default, I just need to put the file under the work directory and pass it to the function.
+
+```{}
+library(zhcweek5) #which would be loaded automatically after building the package
+dat <- reading_in(file = f)
+```
+
+### 5. Explain the logic of the function's sed command.
+#### Put that in the vignette, too. In principle, the @details section of the function's documentation would be a good place to put in, too, but for the sake of the homework, just keep it in the vignette.
+The first section before '|' is to select a range of lines according to given patterns. In the code, it select lines from the line that contains "Per base sequence quality" to the line that first meets "END_MODULE". Then the section after '|' is to remove lines that start with symbol ">>", which are actually the first and the last line.
+
+### 6. Now go back to the function's code and add a variable to the function that adds an additional column to the resulting data frame containing a user-specified sample name (e.g. "WT_ERR458493"). I.e.,the function should get at least one more arguments.
+In the parameter declaration section function(), set an additional parameter called **sample** and with a default emplty string. Then we have
+```{}
+reading_in <- function(file, sample = "", test = "Per base sequence quality")
+```
+After the code where
+```{}
+dat <- data.table::fread(cmd = syscommand, header = TRUE) %>% as.data.frame
+```
+but before where
+```{}
+return(dat)
+```
+Add the following codes:
+```{}
+if(sample!=""){
+sample_name <- rep(sample,nrow(dat))
+dat$sample <- sample_name
+}
+```
+
+If user specify a sample name, it would create a list of the same length as the current dataframe 'dat', and fill in the sample name that user define in the function. At last, the list is added as the last column of the data frame.
+
+Also add
+```{}
+@param sample A sample name that would be specified by user.
+```
+to the descriptional section at the front.
+
+Add additional information corresponding to the change in **Reading_in.Rd**.
+
+### 7. Use your updated function to read in the FastQC results of at leat 4 fastq files that should cover 2 biological replicates and 2 technical replicates of each. Make sure to keep track of the sample name in the new Robjects you're creating.
+I choose technical replicate 1 and 2 for both WT_1 and SNF2_1 as input files.
+```{}
+WT_1_ERR458493 <- reading_in("ERR458493_fastq_data.txt","WT_1_ERR458493")
+WT_1_ERR458494 <- reading_in("ERR458494_fastq_data.txt","WT_1_ERR458494")
+SNF2_1_ERR458500 <- reading_in("ERR458500_fastq_data.txt","SNF2_1_ERR458500")
+SNF2_1_ERR458501 <- reading_in("ERR458501_fastq_data.txt","SNF2_1_ERR458501")
+```
+
+### 8. Combine all these data.frames into one.
+Use `rbind` to combine dataframes by rows vertically.
+```{}
+fastq_df <- rbind(WT_1_ERR458493,WT_1_ERR458494,SNF2_1_ERR458500,SNF2_1_ERR458501)
+```
+
+### 9. The goal is to include that combined data frames as a data object with your package.
+#### Figure out where to store the .rda file within the package infrastructure.
+#### Document your object following the examples. Where do you keep the documentation of the data file?
+Create a directory under the package's root called **data**. Use `save` command to save the combined dataframe under 'data'.
+```{}
+save(df, file="../zhcweek5/data/fastq_df.rda")
+```
+
+Create a R script under directory **R**. Document the **fastq_df.rda** file as below (according to the example provided in ggplot2):
+```{}
+#' Per base sequence quality for 4 samples WT1 technical replicates ERR458493, RR458494
+#' And SNF2 technical replicates ERR458500, ERR459501.
+#' A dataset containing the base position, mean, median, lower quartile, upper quartile,
+#' 0th Percentile and 90th Percentile and sample names for 4 samples.
+#'
+#' @format A data frame with 4*51 = 204 rows and 8 variables:
+#' \describe{
+#'   \item{#Base}{Base position (1 - 51)}
+#'   \item{Mean}{Mean of quality of base in certain position(0 - 41)}
+#'   \item{Median}{Median of quality of base in certain position(0 - 41)}
+#'   \item{Lower Quartile}{Lower quartile of quality of base in certain position(0 - 41)}
+#'   \item{Upper Quartile}{Upper quartile of quality of base in certain position(0 - 41)}
+#'   \item{10th Percentile}{10th Percentile of quality of base in certain position(0 - 41)}
+#'   \item{90th Percentile}{90th Percentile of quality of base in certain position(0 - 41)}
+#'   \item{sample}{sample names}
+#' }
+"fastq_df"
+```
+
+### 10. How do you build your package?
+The way of building it on the local is desribed as in question 4. Also here is the alternative
+way using devtools.
+a. Click **Build** on the top panel, click the last option **Configure Build Tools**, and enter "--as-cran" under **Check R package**.  
+b. Click the **Configure** icon on the right of **Generate Documentation with Roxygen** and tick all the options, click **OK** to exit.  
+c. Click **Build** and **Build and Reload**.  
+d. Click **Build** and **Load All**, enter `?reading_in` to check if content in "reading_in.Rd" successfully appears.  
+e. Create folder **vignettes** and write **zhcweek5.Rmd** Rmarkdown file under it. Use command `devtools::build_vignettes()` to create folder **doc** and **zhcweek5.html** and other components automatically.  
+f. Use command `devtools::build()` to generate the bundle version **zhcweek5.tar.gz**.  
+
+### 11. Make a ggplot2-based plot using the combined data frame. Try to mimick the basic features of the example plot below, but feel free to change the color palette, remove the grey background and other details.
+First installed the package **zhcweek5.tar.gz** in local. Then used the code below to generate the plot.
+
+```{r ggplot}
+getwd()
+#install.packages("../zhcweek5.tar.gz")
+#use zhcweek5::df
+library(zhcweek5)
+library(ggplot2)
+dat <- fastq_df
+WT <- rep("WT",51)
+SNF2 <- rep("SNF2",51)
+type <- c(WT,WT,SNF2,SNF2)
+dat$type <- type
+p <- ggplot(dat, aes(x = `#Base`, y = Mean)) + geom_point(aes(color = sample))
+library(patchwork)
+p1 <- p + facet_grid(. ~ type) + ylim(0,41)
+```
+```{r, fig.width=7,fig.height=4}
+print(p1)
+```
+
+
+
